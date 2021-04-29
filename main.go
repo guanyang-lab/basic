@@ -154,7 +154,7 @@ func main() {
 		for rows.Next() {
 			var table string
 			rows.Scan(&table)
-			table = transferBigCamelCase(strings.Replace(table, "t_", "", 1))
+			table = transferBigCamelCase(strings.Replace(table, conf.Prefix, "", 1))
 			tables = append(tables, table)
 		}
 
