@@ -3,7 +3,6 @@ package service
 
 import (
 	"errors"
-	"{{.AppName}}/conf"
 	"{{.AppName}}/models"
 	"{{.AppName}}/pkg/logging"
 )

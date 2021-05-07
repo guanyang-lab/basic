@@ -18,23 +18,55 @@ type TableInfo struct {
 	StructName      string //结构体
 	StructLowerName string
 	AppName         string
+	Dir             string
+	Want            string
 }
 
 func parse(info TableInfo) {
+	w := []string{"c", "s", "m"}
+	if info.Want != "" {
+		w = strings.Split(info.Want, ",")
+	}
+	tpl := []string{"./template/controller.tpl", "./template/service.tpl", "./template/curd.tpl"}
+	if info.Dir != "" {
+		if strings.Contains(info.Dir, ",") {
+			tpl = strings.Split(info.Dir, ",")
+		} else {
+			if info.Dir[len(info.Dir)-1] == '/' {
+				tpl = []string{info.Dir + "controller.tpl", info.Dir + "service.tpl", info.Dir + "curd.tpl"}
+			} else {
+				tpl = []string{info.Dir + "/controller.tpl", info.Dir + "/service.tpl", info.Dir + "/curd.tpl"}
+			}
+		}
+	}
+	if len(tpl) != 3 {
+		fmt.Println("请传入正确的路径 example:")
+		fmt.Println(" -dir ./template")
+		fmt.Println(" -dir ./template/c.tpl,./template/s.tpl,./template/m.tpl")
+		return
+	}
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go parseModel(info, &wg)
-	go parseService(info, &wg)
-	go parseController(info, &wg)
+	for _, v := range w {
+		if v == "c" {
+			wg.Add(1)
+			go parseController(tpl[0], info, &wg)
+		} else if v == "s" {
+			wg.Add(1)
+			go parseService(tpl[1], info, &wg)
+		} else if v == "m" {
+			wg.Add(1)
+			go parseModel(tpl[2], info, &wg)
+		}
+	}
 	wg.Wait()
 }
-func parseModel(info TableInfo, wg *sync.WaitGroup) {
+func parseModel(path string, info TableInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
 	os.MkdirAll("./models", os.ModePerm)
 	// 解析指定文件生成模板对象
-	tmpl, err := template.ParseFiles("./template/curd.tpl")
+	tmpl, err := template.ParseFiles(path)
 	if err != nil {
-		fmt.Println("create template failed, err:", err)
+		fmt.Println("err:", err.Error())
 		return
 	}
 	// 利用给定数据渲染模板，并将结果写入w
@@ -46,13 +78,13 @@ func parseModel(info TableInfo, wg *sync.WaitGroup) {
 	tmpl.Execute(files, info)
 
 }
-func parseService(info TableInfo, wg *sync.WaitGroup) {
+func parseService(path string, info TableInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
 	os.MkdirAll("./service", os.ModePerm)
 	// 解析指定文件生成模板对象
-	tmpl, err := template.ParseFiles("./template/service.tpl")
+	tmpl, err := template.ParseFiles(path)
 	if err != nil {
-		fmt.Println("create template failed, err:", err)
+		fmt.Println("err:", err.Error())
 		return
 	}
 	// 利用给定数据渲染模板，并将结果写入w
@@ -64,13 +96,13 @@ func parseService(info TableInfo, wg *sync.WaitGroup) {
 	tmpl.Execute(files, info)
 
 }
-func parseController(info TableInfo, wg *sync.WaitGroup) {
+func parseController(path string, info TableInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
 	os.MkdirAll("./endpoint/api/"+info.StructLowerName, os.ModePerm)
 	// 解析指定文件生成模板对象
-	tmpl, err := template.ParseFiles("./template/controller.tpl")
+	tmpl, err := template.ParseFiles(path)
 	if err != nil {
-		fmt.Println("create template failed, err:", err)
+		fmt.Println("err:", err.Error())
 		return
 	}
 	// 利用给定数据渲染模板，并将结果写入w
@@ -92,6 +124,9 @@ func main() {
 		fmt.Println("	-P prefix 指定数据库表名前缀")
 		fmt.Println("	-s struct 指定生成结构体多个以逗号隔开 a,b")
 		fmt.Println("	-n name 指定项目名称 wenshanzhou")
+		fmt.Println("	-want c,s,m 指定想要输出的层(默认3层都会输出),以英文逗号隔开")
+		fmt.Println("	-dir ./template 指定模板文件路径")
+		fmt.Println("	     ./template/controller.tpl,./template/service.tpl,./template/models.tpl 指定模板文件")
 		fmt.Println("示例 ./main -a 127.0.0.1:3306 -u root -p 123456 -P t_")
 		return
 	}
@@ -105,6 +140,8 @@ func main() {
 	conf := tool.MysqlConf{}
 	tables := []string{}
 	appName := ""
+	want := ""
+	dir := ""
 	for i := 0; i < len(os.Args); i++ {
 		switch os.Args[i] {
 		case "-a":
@@ -127,6 +164,12 @@ func main() {
 			i++
 		case "-n":
 			appName = os.Args[i+1]
+			i++
+		case "-want":
+			want = os.Args[i+1]
+			i++
+		case "-dir":
+			dir = os.Args[i+1]
 			i++
 		}
 	}
@@ -163,6 +206,8 @@ func main() {
 				StructName:      v,
 				StructLowerName: strings.ToLower(v[:1]) + v[1:],
 				AppName:         appName,
+				Want:            want,
+				Dir:             dir,
 			})
 		}
 	} else {
@@ -171,6 +216,8 @@ func main() {
 				StructName:      v,
 				StructLowerName: strings.ToLower(v[:1]) + v[1:],
 				AppName:         appName,
+				Want:            want,
+				Dir:             dir,
 			})
 		}
 	}
